@@ -27,6 +27,21 @@
     echo hello from $GREET
   '';
 
+  scripts.ensure_report_renderer.exec = ''
+    set -eu
+    BIN_PATH="$PWD/target/release/report_pdf_renderer"
+    if [ -x "$BIN_PATH" ]; then
+      echo "report_pdf_renderer already built: $BIN_PATH"
+      exit 0
+    fi
+
+    echo "Bootstrapping report_pdf_renderer (release build)..."
+    cargo build --release
+    echo "Built: $BIN_PATH"
+    echo "Production runtime env var:"
+    echo "  export ENDOREG_REPORT_PDF_RENDERER_BIN=$BIN_PATH"
+  '';
+
   # https://devenv.sh/basics/
   enterShell = ''
     hello         # Run scripts directly
@@ -34,10 +49,13 @@
   '';
 
   # https://devenv.sh/tasks/
-  # tasks = {
-  #   "myproj:setup".exec = "mytool build";
-  #   "devenv:enterShell".after = [ "myproj:setup" ];
-  # };
+  tasks = {
+    "report-renderer:bootstrap" = {
+      exec = "ensure_report_renderer";
+      status = "test -x ./target/release/report_pdf_renderer";
+    };
+    "devenv:enterShell".after = [ "report-renderer:bootstrap" ];
+  };
 
   # https://devenv.sh/tests/
   enterTest = ''
