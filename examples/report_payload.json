@@ -1,0 +1,59 @@
+{
+  "title": "Colonoscopy Report",
+  "subtitle": "colonoscopy_standard_v1",
+  "header": {
+    "center_name": "Demo Endoscopy Center",
+    "patient_label": "Pseudo Patient #A12",
+    "examination_date": "2026-02-23",
+    "report_version": "3"
+  },
+  "layout": {
+    "page_width_mm": 210,
+    "page_height_mm": 297,
+    "margin_left_mm": 18,
+    "margin_right_mm": 18,
+    "margin_top_mm": 16,
+    "margin_bottom_mm": 16,
+    "line_height_mm": 5.2,
+    "paragraph_spacing_mm": 2.6,
+    "section_spacing_mm": 5.0,
+    "image_spacing_mm": 4.0
+  },
+  "assets_root": "/data/export/frames",
+  "blocks": [
+    {
+      "type": "sentence_group",
+      "section_title": "Indication",
+      "variables": {
+        "indication": "screening colonoscopy"
+      },
+      "sentences": [
+        {"template": "Procedure indication: {indication}.", "enabled": true}
+      ]
+    },
+    {
+      "type": "sentence_group",
+      "section_title": "Findings",
+      "variables": {
+        "segment": "sigmoid colon",
+        "size_mm": "8",
+        "morphology": "sessile"
+      },
+      "sentences": [
+        {"template": "A {morphology} lesion was identified in the {segment}.", "enabled": true},
+        {"template": "Estimated size: {size_mm} mm.", "enabled": true}
+      ]
+    },
+    {
+      "type": "paragraph",
+      "text": "Intervention was performed without immediate complication. Hemostasis was sufficient."
+    },
+    {
+      "type": "image_grid",
+      "title": "Representative frames",
+      "columns": 3,
+      "image_paths": ["frame_001.png", "frame_145.png", "frame_210.png"],
+      "captions": ["entry", "lesion", "post intervention"]
+    }
+  ]
+}
