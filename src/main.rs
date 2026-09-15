@@ -4,6 +4,7 @@ use printpdf::{BuiltinFont, Image, ImageTransform, Mm, PdfDocument, PdfDocumentR
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 #[derive(Parser, Debug)]
@@ -17,16 +18,16 @@ struct Cli {
 
 #[derive(Debug, Deserialize, Clone)]
 struct LayoutConfig {
-    page_width_mm: Option<f64>,
-    page_height_mm: Option<f64>,
-    margin_left_mm: Option<f64>,
-    margin_right_mm: Option<f64>,
-    margin_top_mm: Option<f64>,
-    margin_bottom_mm: Option<f64>,
-    line_height_mm: Option<f64>,
-    paragraph_spacing_mm: Option<f64>,
-    section_spacing_mm: Option<f64>,
-    image_spacing_mm: Option<f64>,
+    page_width_mm: Option<f32>,
+    page_height_mm: Option<f32>,
+    margin_left_mm: Option<f32>,
+    margin_right_mm: Option<f32>,
+    margin_top_mm: Option<f32>,
+    margin_bottom_mm: Option<f32>,
+    line_height_mm: Option<f32>,
+    paragraph_spacing_mm: Option<f32>,
+    section_spacing_mm: Option<f32>,
+    image_spacing_mm: Option<f32>,
 }
 
 impl Default for LayoutConfig {
@@ -75,7 +76,7 @@ enum Block {
         text: String,
     },
     Spacer {
-        height_mm: Option<f64>,
+        height_mm: Option<f32>,
     },
     SentenceGroup {
         section_title: Option<String>,
@@ -85,14 +86,14 @@ enum Block {
     Image {
         image_path: String,
         caption: Option<String>,
-        width_mm: Option<f64>,
-        height_mm: Option<f64>,
+        width_mm: Option<f32>,
+        height_mm: Option<f32>,
     },
     ImageGrid {
         title: Option<String>,
         columns: Option<usize>,
-        cell_width_mm: Option<f64>,
-        cell_height_mm: Option<f64>,
+        cell_width_mm: Option<f32>,
+        cell_height_mm: Option<f32>,
         image_paths: Vec<String>,
         captions: Option<Vec<String>>,
     },
@@ -111,17 +112,17 @@ struct Renderer {
     layer: PdfLayerIndex,
     font_regular: printpdf::IndirectFontRef,
     font_bold: printpdf::IndirectFontRef,
-    page_width_mm: f64,
-    page_height_mm: f64,
-    margin_left_mm: f64,
-    margin_right_mm: f64,
-    margin_top_mm: f64,
-    margin_bottom_mm: f64,
-    line_height_mm: f64,
-    paragraph_spacing_mm: f64,
-    section_spacing_mm: f64,
-    image_spacing_mm: f64,
-    cursor_y_mm: f64,
+    page_width_mm: f32,
+    page_height_mm: f32,
+    margin_left_mm: f32,
+    margin_right_mm: f32,
+    margin_top_mm: f32,
+    margin_bottom_mm: f32,
+    line_height_mm: f32,
+    paragraph_spacing_mm: f32,
+    section_spacing_mm: f32,
+    image_spacing_mm: f32,
+    cursor_y_mm: f32,
     assets_root: Option<PathBuf>,
 }
 
@@ -167,11 +168,11 @@ impl Renderer {
         self.doc.get_page(self.page).get_layer(self.layer)
     }
 
-    fn content_width_mm(&self) -> f64 {
+    fn content_width_mm(&self) -> f32 {
         self.page_width_mm - self.margin_left_mm - self.margin_right_mm
     }
 
-    fn ensure_vertical_space(&mut self, needed_mm: f64) {
+    fn ensure_vertical_space(&mut self, needed_mm: f32) {
         let limit_y = self.margin_bottom_mm;
         if self.cursor_y_mm - needed_mm < limit_y {
             let (page, layer) = self.doc.add_page(Mm(self.page_width_mm), Mm(self.page_height_mm), "layer");
@@ -181,7 +182,7 @@ impl Renderer {
         }
     }
 
-    fn draw_text_line(&mut self, text: &str, font_size_pt: f64, bold: bool) {
+    fn draw_text_line(&mut self, text: &str, font_size_pt: f32, bold: bool) {
         self.ensure_vertical_space(self.line_height_mm);
         let layer = self.current_layer();
         let font = if bold { &self.font_bold } else { &self.font_regular };
@@ -189,13 +190,13 @@ impl Renderer {
         self.cursor_y_mm -= self.line_height_mm;
     }
 
-    fn estimate_chars_per_line(&self, font_size_pt: f64) -> usize {
+    fn estimate_chars_per_line(&self, font_size_pt: f32) -> usize {
         let width_mm = self.content_width_mm();
-        let avg_char_mm = (font_size_pt * 0.352_778_f64) * 0.48;
+        let avg_char_mm = (font_size_pt * 0.352_778_f32) * 0.48;
         ((width_mm / avg_char_mm).floor() as usize).max(20)
     }
 
-    fn wrap_text(&self, text: &str, font_size_pt: f64) -> Vec<String> {
+    fn wrap_text(&self, text: &str, font_size_pt: f32) -> Vec<String> {
         let max_chars = self.estimate_chars_per_line(font_size_pt);
         let mut out = Vec::new();
         for para in text.split('\n') {
@@ -225,9 +226,9 @@ impl Renderer {
         out
     }
 
-    fn draw_paragraph(&mut self, text: &str, font_size_pt: f64) {
+    fn draw_paragraph(&mut self, text: &str, font_size_pt: f32) {
         let lines = self.wrap_text(text, font_size_pt);
-        let needed = (lines.len() as f64 * self.line_height_mm) + self.paragraph_spacing_mm;
+        let needed = (lines.len() as f32 * self.line_height_mm) + self.paragraph_spacing_mm;
         self.ensure_vertical_space(needed);
         for line in lines {
             self.draw_text_line(&line, font_size_pt, false);
@@ -249,7 +250,7 @@ impl Renderer {
         self.cursor_y_mm -= self.section_spacing_mm / 2.0;
     }
 
-    fn draw_spacer(&mut self, height_mm: f64) {
+    fn draw_spacer(&mut self, height_mm: f32) {
         self.ensure_vertical_space(height_mm);
         self.cursor_y_mm -= height_mm;
     }
@@ -269,8 +270,8 @@ impl Renderer {
         &mut self,
         image_path: &str,
         caption: Option<&str>,
-        width_mm: Option<f64>,
-        height_mm: Option<f64>,
+        width_mm: Option<f32>,
+        height_mm: Option<f32>,
     ) {
         let resolved = self.resolve_image_path(image_path);
         let dyn_img = match image::open(&resolved) {
@@ -281,7 +282,7 @@ impl Renderer {
             }
         };
 
-        let (img_w_px, img_h_px) = (dyn_img.width() as f64, dyn_img.height() as f64);
+        let (img_w_px, img_h_px) = (dyn_img.width() as f32, dyn_img.height() as f32);
         if img_w_px <= 0.0 || img_h_px <= 0.0 {
             self.draw_paragraph("[invalid image dimensions]", 9.0);
             return;
@@ -323,8 +324,8 @@ impl Renderer {
         &mut self,
         title: Option<&str>,
         columns: usize,
-        cell_width_mm: Option<f64>,
-        cell_height_mm: Option<f64>,
+        cell_width_mm: Option<f32>,
+        cell_height_mm: Option<f32>,
         image_paths: &[String],
         captions: Option<&[String]>,
     ) {
@@ -333,8 +334,8 @@ impl Renderer {
         }
         let cols = columns.max(1);
         let gap = self.image_spacing_mm;
-        let total_gap = gap * ((cols - 1) as f64);
-        let w = cell_width_mm.unwrap_or((self.content_width_mm() - total_gap) / cols as f64);
+        let total_gap = gap * ((cols - 1) as f32);
+        let w = cell_width_mm.unwrap_or((self.content_width_mm() - total_gap) / cols as f32);
         let h = cell_height_mm.unwrap_or(w * 0.75);
 
         for (idx, img_path) in image_paths.iter().enumerate() {
@@ -345,7 +346,7 @@ impl Renderer {
                 self.ensure_vertical_space(row_space);
             }
 
-            let x = self.margin_left_mm + (col as f64) * (w + gap);
+            let x = self.margin_left_mm + (col as f32) * (w + gap);
             let y_top = self.cursor_y_mm;
             let resolved = self.resolve_image_path(img_path);
             let dyn_img = match image::open(&resolved) {
@@ -367,8 +368,8 @@ impl Renderer {
             };
 
             let image = Image::from_dynamic_image(&dyn_img);
-            let img_w_px = dyn_img.width() as f64;
-            let img_h_px = dyn_img.height() as f64;
+            let img_w_px = dyn_img.width() as f32;
+            let img_h_px = dyn_img.height() as f32;
             let dpi = 300.0;
             let native_w_mm = img_w_px * 25.4 / dpi;
             let native_h_mm = img_h_px * 25.4 / dpi;
@@ -469,9 +470,12 @@ impl Renderer {
     }
 
     fn save(self, out_path: &Path) -> Result<()> {
-        let mut file = fs::File::create(out_path)
+        let file = fs::File::create(out_path)
             .with_context(|| format!("create output file {}", out_path.display()))?;
-        self.doc.save(&mut file)?;
+        let mut writer = BufWriter::new(file);
+        self.doc.save(&mut writer)?;
+        writer.flush()
+            .with_context(|| format!("flush output file {}", out_path.display()))?;
         Ok(())
     }
 }

@@ -2,6 +2,10 @@
 
 Standalone PDF renderer for persisted report templates.
 
+This repository is vendored into `endoreg-db` at:
+
+- `lx-report-generator/`
+
 ## Goals
 - Fast standalone binary (Rust)
 - Render report sections with explicit spacing/layout rules
@@ -9,21 +13,31 @@ Standalone PDF renderer for persisted report templates.
 - Render template sentence sections with variable substitution
 - Callable from Python (`subprocess`) without importing heavy PDF libs
 
-## Quick Start (with `devenv`)
-This repo includes a `devenv.nix` with Rust tooling.
+## Quick Start (with Nix / `devenv`)
+This repo includes a `devenv.nix` with Rust tooling and a bootstrap task.
+
+From the `endoreg-db` repository root:
 
 ```bash
-cd tools/report_pdf_renderer_rust
+cd lx-report-generator
+direnv allow   # optional, if you use direnv
 devenv shell
 ```
 
-Then build and run:
+On shell entry, `devenv` bootstraps the release binary automatically if missing.
+
+Then generate a PDF from the example payload:
 
 ```bash
-cargo build --release
 ./target/release/report_pdf_renderer \
   --input examples/report_payload.json \
   --output /tmp/report_example.pdf
+```
+
+Equivalent explicit build:
+
+```bash
+cargo build --release
 ```
 
 Open the generated file:
@@ -36,6 +50,47 @@ xdg-open /tmp/report_example.pdf
 ```bash
 cargo build --release
 # binary: target/release/report_pdf_renderer
+```
+
+## Setup For `endoreg_db` Runtime
+
+Build and export the runtime path from the vendored standalone module:
+
+```bash
+cd /home/admin/endoreg-db/lx-report-generator
+devenv shell
+export ENDOREG_REPORT_PDF_RENDERER_BIN="$PWD/target/release/report_pdf_renderer"
+```
+
+Optional local install:
+
+```bash
+install -m755 target/release/report_pdf_renderer ~/.local/bin/report_pdf_renderer
+export ENDOREG_REPORT_PDF_RENDERER_BIN="$HOME/.local/bin/report_pdf_renderer"
+```
+
+Verify the backend resolves the standalone binary:
+
+```bash
+cd /home/admin/endoreg-db
+python - <<'PY'
+from endoreg_db.services.report_pdf_renderer import get_renderer_binary
+print(get_renderer_binary())
+PY
+```
+
+## Clone Standalone Repo Separately
+
+If you want to work on the renderer outside this checkout:
+
+```bash
+git clone git@github.com:wg-lux/lx-report-generator.git
+cd lx-report-generator
+direnv allow   # optional
+devenv shell
+./target/release/report_pdf_renderer \
+  --input examples/report_payload.json \
+  --output /tmp/report_example.pdf
 ```
 
 ## CLI
